@@ -1,0 +1,1035 @@
+import numpy as np
+import random
+import heapq
+import time
+
+COLOR_BLACK=-1
+COLOR_WHITE=1
+COLOR_NONE=0
+random.seed(0)
+#don't change the class name
+class AI(object):
+    #chessboard_size, color, time_out passed from agent
+    def __init__(self, chessboard_size, color, time_out):
+        self.chessboard_size = chessboard_size
+        #You are white or black
+        self.color = color
+        #the max time you should use, your algorithm's run time must not exceed the time limit.
+        self.time_out = time_out
+        # You need add your decision into your candidate_list. System will get the end of your candidate_list as your decision .
+        self.candidate_list = []
+        self.chessboard = []
+        self.whiteValue = []
+        self.blackValue = []
+        self.my_value = []
+        self.enemy_value = []
+        self.count = 0
+        self.is_new_chessboard = False
+    # The input is current chessboard.
+
+    # When pass the chessboard, the program first check whether it is a half or a new game
+    # To complete that, I design a count to record
+    # When the count == 0, first program scan the chessboard and turn it into chars: scan_turn
+    # After the char-chessboard is finished, program evaluate each none-pos
+    # To reduce the complexity, program would use different strategies to evaluate
+    # After the evaluation is completed, the computer decide which to go by using decide_go
+    def go(self, chessboard=[]):
+        # Clear candidate_list
+        self.candidate_list.clear()
+        # ==================================================================
+        idx = np.where(chessboard != COLOR_NONE)
+        idx = list(zip(idx[0], idx[1]))
+        if self.count == 0:
+            self.scan_turn(chessboard)
+            if (len(idx) == 0 and self.color == COLOR_BLACK) or (len(idx) == 1 and self.color == COLOR_WHITE):
+                self.is_new_chessboard = True
+                #self.begin()                                # new chessboard strategy
+                if self.color == COLOR_BLACK:
+                    x = (int)(self.chessboard_size / 2)
+                    y = (int)(self.chessboard_size / 2 - 1)
+                    self.candidate_list.append([x, y])
+                    self.chessboard[x][y] = '1' if self.color == COLOR_WHITE else '2'
+                else:
+                    self.scan_value(idx[0][0], idx[0][1])
+                    self.decide_go()
+
+                self.count += 1
+            elif len(idx) < self.chessboard_size ** 2 / 2:
+                self.evaluate_if_less_chess(idx)
+                self.decide_go()
+            else:
+                idx = np.where(chessboard == COLOR_NONE)
+                idx = list(zip(idx[0], idx[1]))
+                self.evaluate_if_less_space(idx)
+                self.decide_go()
+        # elif self.is_new_chessboard and self.count <= 8:
+            # strategy
+        else:
+            pos = chessboard[-1]
+            self.add_new_pos_to_chessboard(pos)
+            self.scan_value(pos[0], pos[1])
+            self.decide_go()
+        print(self.candidate_list[-1])
+
+
+        #Write your algorithm here
+        #Here is the simplest sample:Random decision
+
+        #==============Find new pos========================================
+        # Make sure that the position of your decision in chess board is empty.
+        #If not, return error.
+
+    def evaluate_if_less_chess(self, idx=[]):
+        for i in range(len(idx)):
+            self.scan_value(idx[i][0], idx[i][1])
+
+    def evaluate_if_less_space(self, idx=[]):
+        for i in range(len(idx)):
+            self.calculate_mine(idx[i][0], idx[i][1])
+            self.calculate_enemy(idx[i][0], idx[i][1])
+
+    # decide and load the next pos to the list
+    # update the chessboard
+    def decide_go(self):
+        self.is_win()
+        self.is_almost_lost()
+
+        if self.color == COLOR_WHITE:
+            if len(self.blackValue) == 0 or self.whiteValue[0][0] <= self.blackValue[0][0]:
+                self.candidate_list.append([self.whiteValue[0][1], self.whiteValue[0][2]])
+            else:
+                self.candidate_list.append([self.blackValue[0][1], self.blackValue[0][2]])
+        else:
+            if len(self.whiteValue) == 0 or self.blackValue[0][0] <= self.whiteValue[0][0]:
+                self.candidate_list.append([self.blackValue[0][1], self.blackValue[0][2]])
+            else:
+                self.candidate_list.append([self.whiteValue[0][1], self.whiteValue[0][2]])
+        self.chessboard[self.candidate_list[-1][0]][self.candidate_list[-1][1]] = '1' if self.color == COLOR_WHITE else '2'
+
+    def check_value(self, str, is_bound_front, is_bound_behind):
+        is_both_bound = is_bound_behind and is_bound_front
+        is_bound_by_one_side = (is_bound_front or is_bound_behind) and not is_both_bound
+        if str == "11111" or str == "22222":
+            return 1
+        if (str == "01111" and not is_bound_behind) or (str == "11110" and not is_bound_behind):
+            return 2
+        if (str == ("02222" and not is_bound_behind) or (str == "22220" and not is_bound_behind):
+            return 2
+        if (str == "21111" and not is_bound_behind) or (str == "01111" and is_bound_behind):
+            return 3
+        if (str == "11112" and not is_bound_front) or (str == "11110" and is_bound_front):
+            return 3
+        if (str == "12222" and not is_bound_behind) or (str == "02222" and is_bound_behind):
+            return 3
+        if (str == "22221" and not is_bound_front) or (str == "22220" and is_bound_front):
+            return 3
+        if (str == "10111" and is_bound_by_one_side) or (str == "11011" and is_bound_by_one_side) or (str == "11101" and is_bound_by_one_side):
+            return 4
+
+
+
+
+
+    # scan the chessboard and turn to the char type
+    def scan_turn(self, chessboard):
+        for i in range(self.chessboard_size):
+            str = ""
+            for j in range(self.chessboard_size):
+                if chessboard[i][j] == COLOR_NONE:
+                    str += '0'
+                elif chessboard[i][j] == COLOR_WHITE:
+                    str += '1'
+                else:
+                    str += '2'
+            self.chessboard.append(list(str))
+
+    # update the chessboard, used when the chessboard is updated
+    def add_new_pos_to_chessboard(self, pos):
+        if self.color == COLOR_WHITE:
+            self.chessboard[pos[0]][pos[1]] = '2'
+        else:
+            self.chessboard[pos[0]][pos[1]] = '1'
+
+    # calculate the value of the pos as I take it, the pos must be a none
+    def calculate_mine(self, pos_x, pos_y):
+        if self.color == COLOR_WHITE:
+            self.calculate_white(pos_x, pos_y)
+        else:
+            self.calculate_black(pos_x, pos_y)
+    # calculate the value of the pos as the enemy take it, the pos must be a none
+    def calculate_enemy(self, pos_x, pos_y):
+        if self.color == COLOR_WHITE:
+            self.calculate_black(pos_x, pos_y)
+        else:
+            self.calculate_white(pos_x, pos_y)
+    # check if I win and clean the redundant records
+    def is_win(self):
+        if self.color == COLOR_WHITE and len(self.whiteValue) > 0:
+            x = self.whiteValue[0][1]
+            y = self.whiteValue[0][2]
+            while len(self.whiteValue) > 0 and self.chessboard[x][y] != '0':
+                heapq.heappop(self.whiteValue)
+                x = self.whiteValue[0][1]
+                y = self.whiteValue[0][2]
+            if self.whiteValue[0][0] == 1:
+                return True
+        elif self.color == COLOR_BLACK and len(self.blackValue) > 0:
+            x = self.blackValue[0][1]
+            y = self.blackValue[0][2]
+            while len(self.blackValue) > 0 and self.chessboard[x][y] != '0':
+                heapq.heappop(self.blackValue)
+                x = self.blackValue[0][1]
+                y = self.blackValue[0][2]
+            if self.blackValue[0][0] == 1:
+                return True
+        return False
+
+    # check if I will lost and clean the redundant records
+    def is_almost_lost(self):
+        if self.color == COLOR_BLACK and len(self.whiteValue) > 0:
+            x = self.whiteValue[0][1]
+            y = self.whiteValue[0][2]
+            while len(self.whiteValue) > 0 and self.chessboard[x][y] != '0':
+                heapq.heappop(self.whiteValue)
+                x = self.whiteValue[0][1]
+                y = self.whiteValue[0][2]
+            if self.whiteValue[0][0] == 1:
+                return True
+        elif self.color == COLOR_WHITE and len(self.blackValue) > 0:
+            x = self.blackValue[0][1]
+            y = self.blackValue[0][2]
+            while len(self.blackValue) > 0 and self.chessboard[x][y] != '0':
+                heapq.heappop(self.blackValue)
+                x = self.blackValue[0][1]
+                y = self.blackValue[0][2]
+            if self.blackValue[0][0] == 1:
+                return True
+        return False
+
+    # when the chessboard is updated, check the pos and update the value information
+    def scan_value(self, pos_x, pos_y):
+        if pos_y - 1 >= 0 and self.chessboard[pos_x][pos_y - 1] == '0':
+            self.calculate_mine(pos_x, pos_y - 1)
+        if pos_y - 2 >= 0 and self.chessboard[pos_x][pos_y - 2] == '0':
+            self.calculate_mine(pos_x, pos_y - 2)
+        if pos_y - 3 >= 0 and self.chessboard[pos_x][pos_y - 3] == '0':
+            self.calculate_mine(pos_x, pos_y - 3)
+        if pos_y - 4 >= 0 and self.chessboard[pos_x][pos_y - 4] == '0':
+            self.calculate_mine(pos_x, pos_y - 4)
+
+        if pos_y + 1 < self.chessboard_size and self.chessboard[pos_x][pos_y + 1] == '0':
+            self.calculate_mine(pos_x, pos_y + 1)
+        if pos_y + 2 < self.chessboard_size and self.chessboard[pos_x][pos_y + 2] == '0':
+            self.calculate_mine(pos_x, pos_y + 2)
+        if pos_y + 3 < self.chessboard_size and self.chessboard[pos_x][pos_y + 3] == '0':
+            self.calculate_mine(pos_x, pos_y + 3)
+        if pos_y + 4 < self.chessboard_size and self.chessboard[pos_x][pos_y + 4] == '0':
+            self.calculate_mine(pos_x, pos_y + 4)
+
+        if self.is_win():
+            return
+
+        if pos_x - 1 >= 0 and self.chessboard[pos_x - 1][pos_y] == '0':
+            self.calculate_mine(pos_x - 1, pos_y)
+        if pos_x - 2 >= 0 and self.chessboard[pos_x - 2][pos_y] == '0':
+            self.calculate_mine(pos_x - 2, pos_y)
+        if pos_x - 3 >= 0 and self.chessboard[pos_x - 3][pos_y] == '0':
+            self.calculate_mine(pos_x - 3, pos_y)
+        if pos_x - 4 >= 0 and self.chessboard[pos_x - 4][pos_y] == '0':
+            self.calculate_mine(pos_x - 4, pos_y)
+
+        if pos_x + 1 < self.chessboard_size and self.chessboard[pos_x + 1][pos_y] == '0':
+            self.calculate_mine(pos_x + 1, pos_y)
+        if pos_x + 2 < self.chessboard_size and self.chessboard[pos_x + 2][pos_y] == '0':
+            self.calculate_mine(pos_x + 2, pos_y)
+        if pos_x + 3 < self.chessboard_size and self.chessboard[pos_x + 3][pos_y] == '0':
+            self.calculate_mine(pos_x + 3, pos_y)
+        if pos_x + 4 < self.chessboard_size and self.chessboard[pos_x + 4][pos_y] == '0':
+            self.calculate_mine(pos_x + 4, pos_y)
+
+        if self.is_win():
+            return
+
+        if pos_x - 1 >= 0 and pos_y - 1 >= 0 and self.chessboard[pos_x - 1][pos_y - 1] == '0':
+            self.calculate_mine(pos_x - 1, pos_y - 1)
+        if pos_x - 2 >= 0 and pos_y - 2 >= 0 and self.chessboard[pos_x - 2][pos_y - 2] == '0':
+            self.calculate_mine(pos_x - 2, pos_y - 2)
+        if pos_x - 3 >= 0 and pos_y - 3 >= 0 and self.chessboard[pos_x - 3][pos_y - 3] == '0':
+            self.calculate_mine(pos_x - 3, pos_y - 3)
+        if pos_x - 4 >= 0 and pos_y - 4 >= 0 and self.chessboard[pos_x - 4][pos_y - 4] == '0':
+            self.calculate_mine(pos_x - 4, pos_y - 4)
+
+        if pos_x + 1 < self.chessboard_size and pos_y + 1 < self.chessboard_size and self.chessboard[pos_x + 1][pos_y + 1] == '0':
+            self.calculate_mine(pos_x + 1, pos_y + 1)
+        if pos_x + 2 < self.chessboard_size and pos_y + 2 < self.chessboard_size and self.chessboard[pos_x + 2][pos_y + 2] == '0':
+            self.calculate_mine(pos_x + 2, pos_y + 2)
+        if pos_x + 3 < self.chessboard_size and pos_y + 3 < self.chessboard_size and self.chessboard[pos_x + 3][pos_y + 3] == '0':
+            self.calculate_mine(pos_x + 3, pos_y + 3)
+        if pos_x + 4 < self.chessboard_size and pos_y + 4 < self.chessboard_size and self.chessboard[pos_x + 4][pos_y + 4] == '0':
+            self.calculate_mine(pos_x + 4, pos_y + 4)
+
+        if self.is_win():
+            return
+
+        if pos_x - 1 >= 0 and pos_y + 1 < self.chessboard_size and self.chessboard[pos_x - 1][pos_y + 1] == '0':
+            self.calculate_mine(pos_x - 1, pos_y + 1)
+        if pos_x - 2 >= 0 and pos_y + 2 < self.chessboard_size and self.chessboard[pos_x - 2][pos_y + 2] == '0':
+            self.calculate_mine(pos_x - 2, pos_y + 2)
+        if pos_x - 3 >= 0 and pos_y + 3 < self.chessboard_size and self.chessboard[pos_x - 3][pos_y + 3] == '0':
+            self.calculate_mine(pos_x - 3, pos_y + 3)
+        if pos_x - 4 >= 0 and pos_y + 4 < self.chessboard_size and self.chessboard[pos_x - 4][pos_y + 4] == '0':
+            self.calculate_mine(pos_x - 4, pos_y + 4)
+
+        if pos_x + 1 < self.chessboard_size and pos_y - 1 >= 0 and self.chessboard[pos_x + 1][pos_y - 1] == '0':
+            self.calculate_mine(pos_x + 1, pos_y - 1)
+        if pos_x + 2 < self.chessboard_size and pos_y - 2 >= 0 and self.chessboard[pos_x + 2][pos_y - 2] == '0':
+            self.calculate_mine(pos_x + 2, pos_y - 2)
+        if pos_x + 3 < self.chessboard_size and pos_y - 3 >= 0 and self.chessboard[pos_x + 3][pos_y - 3] == '0':
+            self.calculate_mine(pos_x + 3, pos_y - 3)
+        if pos_x + 4 < self.chessboard_size and pos_y - 4 >= 0 and self.chessboard[pos_x + 4][pos_y - 4] == '0':
+            self.calculate_mine(pos_x + 4, pos_y - 4)
+
+        if self.is_win():
+            return
+        if self.is_almost_lost():
+            return
+
+        if pos_y - 1 >= 0 and self.chessboard[pos_x][pos_y - 1] == '0':
+            self.calculate_enemy(pos_x, pos_y - 1)
+        if pos_y - 2 >= 0 and self.chessboard[pos_x][pos_y - 2] == '0':
+            self.calculate_enemy(pos_x, pos_y - 2)
+        if pos_y - 3 >= 0 and self.chessboard[pos_x][pos_y - 3] == '0':
+            self.calculate_enemy(pos_x, pos_y - 3)
+        if pos_y - 4 >= 0 and self.chessboard[pos_x][pos_y - 4] == '0':
+            self.calculate_enemy(pos_x, pos_y - 4)
+
+        if pos_y + 1 < self.chessboard_size and self.chessboard[pos_x][pos_y + 1] == '0':
+            self.calculate_enemy(pos_x, pos_y + 1)
+        if pos_y + 2 < self.chessboard_size and self.chessboard[pos_x][pos_y + 2] == '0':
+            self.calculate_enemy(pos_x, pos_y + 2)
+        if pos_y + 3 < self.chessboard_size and self.chessboard[pos_x][pos_y + 3] == '0':
+            self.calculate_enemy(pos_x, pos_y + 3)
+        if pos_y + 4 < self.chessboard_size and self.chessboard[pos_x][pos_y + 4] == '0':
+            self.calculate_enemy(pos_x, pos_y + 4)
+
+        if self.is_almost_lost():
+            return
+
+        if pos_x - 1 >= 0 and self.chessboard[pos_x - 1][pos_y] == '0':
+            self.calculate_enemy(pos_x - 1, pos_y)
+        if pos_x - 2 >= 0 and self.chessboard[pos_x - 2][pos_y] == '0':
+            self.calculate_enemy(pos_x - 2, pos_y)
+        if pos_x - 3 >= 0 and self.chessboard[pos_x - 3][pos_y] == '0':
+            self.calculate_enemy(pos_x - 3, pos_y)
+        if pos_x - 4 >= 0 and self.chessboard[pos_x - 4][pos_y] == '0':
+            self.calculate_enemy(pos_x - 4, pos_y)
+
+        if pos_x + 1 < self.chessboard_size and self.chessboard[pos_x + 1][pos_y] == '0':
+            self.calculate_enemy(pos_x + 1, pos_y)
+        if pos_x + 2 < self.chessboard_size and self.chessboard[pos_x + 2][pos_y] == '0':
+            self.calculate_enemy(pos_x + 2, pos_y)
+        if pos_x + 3 < self.chessboard_size and self.chessboard[pos_x + 3][pos_y] == '0':
+            self.calculate_enemy(pos_x + 3, pos_y)
+        if pos_x + 4 < self.chessboard_size and self.chessboard[pos_x + 4][pos_y] == '0':
+            self.calculate_enemy(pos_x + 4, pos_y)
+
+        if self.is_almost_lost():
+            return
+
+        if pos_x - 1 >= 0 and pos_y - 1 >= 0 and self.chessboard[pos_x - 1][pos_y - 1] == '0':
+            self.calculate_enemy(pos_x - 1, pos_y - 1)
+        if pos_x - 2 >= 0 and pos_y - 2 >= 0 and self.chessboard[pos_x - 2][pos_y - 2] == '0':
+            self.calculate_enemy(pos_x - 2, pos_y - 2)
+        if pos_x - 3 >= 0 and pos_y - 3 >= 0 and self.chessboard[pos_x - 3][pos_y - 3] == '0':
+            self.calculate_enemy(pos_x - 3, pos_y - 3)
+        if pos_x - 4 >= 0 and pos_y - 4 >= 0 and self.chessboard[pos_x - 4][pos_y - 4] == '0':
+            self.calculate_enemy(pos_x - 4, pos_y - 4)
+
+        if pos_x + 1 < self.chessboard_size and pos_y + 1 < self.chessboard_size and self.chessboard[pos_x + 1][pos_y + 1] == '0':
+            self.calculate_enemy(pos_x + 1, pos_y + 1)
+        if pos_x + 2 < self.chessboard_size and pos_y + 2 < self.chessboard_size and self.chessboard[pos_x + 2][pos_y + 2] == '0':
+            self.calculate_enemy(pos_x + 2, pos_y + 2)
+        if pos_x + 3 < self.chessboard_size and pos_y + 3 < self.chessboard_size and self.chessboard[pos_x + 3][pos_y + 3] == '0':
+            self.calculate_enemy(pos_x + 3, pos_y + 3)
+        if pos_x + 4 < self.chessboard_size and pos_y + 4 < self.chessboard_size and self.chessboard[pos_x + 4][pos_y + 4] == '0':
+            self.calculate_enemy(pos_x + 4, pos_y + 4)
+
+        if self.is_almost_lost():
+            return
+
+        if pos_x - 1 >= 0 and pos_y + 1 < self.chessboard_size and self.chessboard[pos_x - 1][pos_y + 1] == '0':
+            self.calculate_enemy(pos_x - 1, pos_y + 1)
+        if pos_x - 2 >= 0 and pos_y + 2 < self.chessboard_size and self.chessboard[pos_x - 2][pos_y + 2] == '0':
+            self.calculate_enemy(pos_x - 2, pos_y + 2)
+        if pos_x - 3 >= 0 and pos_y + 3 < self.chessboard_size and self.chessboard[pos_x - 3][pos_y + 3] == '0':
+            self.calculate_enemy(pos_x - 3, pos_y + 3)
+        if pos_x - 4 >= 0 and pos_y + 4 < self.chessboard_size and self.chessboard[pos_x - 4][pos_y + 4] == '0':
+            self.calculate_enemy(pos_x - 4, pos_y + 4)
+
+        if pos_x + 1 < self.chessboard_size and pos_y - 1 >= 0 and self.chessboard[pos_x + 1][pos_y - 1] == '0':
+            self.calculate_enemy(pos_x + 1, pos_y - 1)
+        if pos_x + 2 < self.chessboard_size and pos_y - 2 >= 0 and self.chessboard[pos_x + 2][pos_y - 2] == '0':
+            self.calculate_enemy(pos_x + 2, pos_y - 2)
+        if pos_x + 3 < self.chessboard_size and pos_y - 3 >= 0 and self.chessboard[pos_x + 3][pos_y - 3] == '0':
+            self.calculate_enemy(pos_x + 3, pos_y - 3)
+        if pos_x + 4 < self.chessboard_size and pos_y - 4 >= 0 and self.chessboard[pos_x + 4][pos_y - 4] == '0':
+            self.calculate_enemy(pos_x + 4, pos_y - 4)
+
+        if self.is_almost_lost():
+            return
+
+    def calculate_white(self, pos_x, pos_y): #pos of xy must be none
+        count_5 = 0
+        count_4_unbound = 0
+        count_4_bound = 0
+        count_4_leak_bound = 0
+        count_3_unbound = 0
+        count_3_leak_unbound = 0
+        is_dead = True
+        #check y
+        x = pos_x
+        y = pos_y
+        count = 1
+        space = False
+        leak = False
+        i = 0
+        is_bound = False
+        both_bound = False
+        is_related = False
+
+        while y-1 >= 0 and self.chessboard[x][y-1] != '2' and i < 4:
+            y = y - 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    y += 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+                    return
+        if (y == 0 or self.chessboard[x][y - 1] == '2') and not (space and not leak):
+            is_bound = True
+        y = pos_y
+        i = 0
+        space = False
+        while y+1 < self.chessboard_size and self.chessboard[x][y+1] != '2' and i < 4:
+            y = y + 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    y -= 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+                    return
+        if (y+1 == self.chessboard_size or self.chessboard[x][y + 1] == '2') and not (space and not leak):
+            if is_bound:
+                both_bound = True
+            else:
+                is_bound = True
+        if pos_x == 7 and pos_y == 4:
+            print(count, is_bound)
+        if count >= 5 and not leak:
+            heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+            return
+        elif count == 4 and not is_bound and not leak:
+            count_4_unbound += 1
+        elif count == 4 and not both_bound and not leak:
+            count_4_bound += 1
+        elif count == 4 and not both_bound:
+            count_4_leak_bound += 1
+        elif count == 3 and not is_bound and not leak:
+            count_3_unbound += 1
+        elif count == 3 and not is_bound:
+            count_3_leak_unbound += 1
+        elif count > 0 and not is_dead:
+            is_related = True
+        is_dead = is_dead and both_bound
+
+        #check x
+        x = pos_x
+        y = pos_y
+        count = 1
+        i = 0
+        space = False
+        is_bound = False
+        both_bound = False
+        leak = False
+
+        while x - 1 >= 0 and self.chessboard[x - 1][y] != '2' and i < 4:
+            x = x - 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    x += 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+                    return
+        if (x == 0 or self.chessboard[x - 1][y] == '2') and not (space and not leak):
+            is_bound = True
+        x = pos_x
+        i = 0
+        space = False
+        while x + 1 < self.chessboard_size and self.chessboard[x + 1][y] != '2' and i < 4:
+            x = x + 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    x -= 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+                    return
+
+        if (x + 1 == self.chessboard_size or self.chessboard[x + 1][y] == '2') and not (space and not leak):
+            if is_bound:
+                both_bound = True
+            else:
+                is_bound = True
+        if count >= 5 and not leak:
+            heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+            return
+        elif count == 4 and not is_bound and not leak:
+            count_4_unbound += 1
+        elif count == 4 and not both_bound and not leak:
+            count_4_bound += 1
+        elif count == 4 and not both_bound:
+            count_4_leak_bound += 1
+        elif count == 3 and not is_bound and not leak:
+            count_3_unbound += 1
+        elif count == 3 and not is_bound:
+            count_3_leak_unbound += 1
+        elif count > 0 and not is_dead:
+            is_related = True
+        is_dead = is_dead and both_bound
+
+        #check x,y
+        x = pos_x
+        y = pos_y
+        count = 1
+        i = 0
+        is_bound = False
+        both_bound = False
+        space = False
+        leak = False
+        while x - 1 >= 0 and y - 1 >= 0 and self.chessboard[x - 1][y - 1] != '2' and i < 4:
+            x = x - 1
+            y = y - 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    y += 1
+                    x += 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+                    return
+        if (x == 0 or y == 0 or self.chessboard[x - 1][y - 1] == '2') and not (space and not leak):
+            is_bound = True
+        x = pos_x
+        y = pos_y
+        i = 0
+        space = False
+        while x + 1 < self.chessboard_size and y + 1 < self.chessboard_size and self.chessboard[x + 1][y + 1] != '2' and i < 4:
+            x = x + 1
+            y = y + 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    y -= 1
+                    x -= 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+                    return
+
+        if (x + 1 == self.chessboard_size or y + 1 == self.chessboard_size or self.chessboard[x + 1][y + 1] == '2') and not (space and not leak):
+            if is_bound:
+                both_bound = True
+            else:
+                is_bound = True
+
+        if count >= 5 and not leak:
+            heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+            return
+        elif count == 4 and not is_bound and not leak:
+            count_4_unbound += 1
+        elif count == 4 and not both_bound and not leak:
+            count_4_bound += 1
+        elif count == 4 and not both_bound:
+            count_4_leak_bound += 1
+        elif count == 3 and not is_bound and not leak:
+            count_3_unbound += 1
+        elif count == 3 and not is_bound:
+            count_3_leak_unbound += 1
+        elif count > 0 and not is_dead:
+            is_related = True
+        is_dead = is_dead and both_bound
+
+        #check y,x
+        x = pos_x
+        y = pos_y
+        count = 1
+        i = 0
+        is_bound = False
+        both_bound = False
+        space = False
+        leak = False
+        while x + 1 < self.chessboard_size and y - 1 >= 0 and self.chessboard[x + 1][y - 1] != '2' and i < 4:
+            x = x + 1
+            y = y - 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    y += 1
+                    x -= 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+                    return
+
+        if (x + 1 == self.chessboard_size or y == 0 or self.chessboard[x + 1][y - 1] == '2') and not (space and not leak):
+            is_bound = True
+        x = pos_x
+        y = pos_y
+        i = 0
+        space = False
+        while x - 1 >= 0 and y + 1 < self.chessboard_size and self.chessboard[x - 1][y + 1] != '2' and i < 4:
+            x = x - 1
+            y = y + 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    y -= 1
+                    x += 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+                    return
+        if (x == 0 or y + 1 == self.chessboard_size or self.chessboard[x - 1][y + 1] == '2') and not (space and not leak):
+            if is_bound:
+                both_bound = True
+            else:
+                is_bound = True
+        if count >= 5 and not leak:
+            heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+            return
+        elif count == 4 and not is_bound and not leak:
+            count_4_unbound += 1
+        elif count == 4 and not both_bound and not leak:
+            count_4_bound += 1
+        elif count == 4 and not both_bound:
+            count_4_leak_bound += 1
+        elif count == 3 and not is_bound and not leak:
+            count_3_unbound += 1
+        elif count == 3 and not is_bound:
+            count_3_leak_unbound += 1
+        elif count > 0 and not is_dead:
+            is_related = True
+        is_dead = is_dead and both_bound
+
+        if count_5 > 0:
+            heapq.heappush(self.whiteValue, (1, pos_x, pos_y))
+            return
+        count4b = count_4_leak_bound + count_4_bound
+        count3u = count_3_leak_unbound + count_3_unbound
+        if count_4_unbound > 0 or count4b > 1 or (count3u >= 1 and count4b >= 1):
+            heapq.heappush(self.whiteValue, (2, pos_x, pos_y))
+            return
+        if count3u > 1:
+            heapq.heappush(self.whiteValue, (3, pos_x, pos_y))
+            return
+        if count_3_unbound > 0 or count_4_bound > 0:
+            heapq.heappush(self.whiteValue, (4, pos_x, pos_y))
+            return
+        if is_related and not is_dead:
+            heapq.heappush(self.whiteValue, (5, pos_x, pos_y))
+            return
+        if not is_dead:
+            heapq.heappush(self.whiteValue, (6, pos_x, pos_y))
+        else:
+            heapq.heappush(self.whiteValue, (7, pos_x, pos_y))
+
+    def calculate_black(self, pos_x, pos_y): #pos of xy must be none
+        count_5 = 0
+        count_4_unbound = 0
+        count_4_bound = 0
+        count_4_leak_bound = 0
+        count_3_unbound = 0
+        count_3_leak_unbound = 0
+        is_dead = True
+        # check y
+        x = pos_x
+        y = pos_y
+        count = 1
+        space = False
+        leak = False
+        i = 0
+        is_bound = False
+        both_bound = False
+        is_related = False
+        while y - 1 >= 0 and self.chessboard[x][y - 1] != '1' and i < 4:
+            y = y - 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    y += 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+                    return
+        if (y == 0 or self.chessboard[x][y - 1] == '1') and not (space and not leak):
+            is_bound = True
+        y = pos_y
+        i = 0
+        space = False
+
+        while y + 1 < self.chessboard_size and self.chessboard[x][y + 1] != '1' and i < 4:
+            y = y + 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    y -= 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+                    return
+        if (y + 1 == self.chessboard_size or self.chessboard[x][y + 1] == '1') and not (space and not leak):
+            if is_bound:
+                both_bound = True
+            else:
+                is_bound = True
+        if count >= 5 and not leak:
+            heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+            return
+        elif count == 4 and not is_bound and not leak:
+            count_4_unbound += 1
+        elif count == 4 and not both_bound and not leak:
+            count_4_bound += 1
+        elif count == 4 and not both_bound:
+            count_4_leak_bound += 1
+        elif count == 3 and not is_bound and not leak:
+            count_3_unbound += 1
+        elif count == 3 and not is_bound:
+            count_3_leak_unbound += 1
+        elif count > 0 and not is_dead:
+            is_related = True
+        is_dead = is_dead and both_bound
+
+        # check x
+        x = pos_x
+        y = pos_y
+        count = 1
+        i = 0
+        space = False
+        is_bound = False
+        both_bound = False
+        leak = False
+
+        while x - 1 >= 0 and self.chessboard[x - 1][y] != '1' and i < 4:
+            x = x - 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    x += 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+                    return
+        if (x == 0 or self.chessboard[x - 1][y] == '1') and not (space and not leak):
+            is_bound = True
+        x = pos_x
+        i = 0
+        space = False
+        while x + 1 < self.chessboard_size and self.chessboard[x + 1][y] != '1' and i < 4:
+            x = x + 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    x -= 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+                    return
+
+        if (x + 1 == self.chessboard_size or self.chessboard[x + 1][y] == '1') and not (space and not leak):
+            if is_bound:
+                both_bound = True
+            else:
+                is_bound = True
+        if count >= 5 and not leak:
+            heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+            return
+        elif count == 4 and not is_bound and not leak:
+            count_4_unbound += 1
+        elif count == 4 and not both_bound and not leak:
+            count_4_bound += 1
+        elif count == 4 and not both_bound:
+            count_4_leak_bound += 1
+        elif count == 3 and not is_bound and not leak:
+            count_3_unbound += 1
+        elif count == 3 and not is_bound:
+            count_3_leak_unbound += 1
+        elif count > 0 and not is_dead:
+            is_related = True
+        is_dead = is_dead and both_bound
+
+        # check x,y
+        x = pos_x
+        y = pos_y
+        count = 1
+        i = 0
+        is_bound = False
+        both_bound = False
+        space = False
+        leak = False
+        while x - 1 >= 0 and y - 1 >= 0 and self.chessboard[x - 1][y - 1] != '1' and i < 4:
+            x = x - 1
+            y = y - 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    y += 1
+                    x += 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+                    return
+        if (x == 0 or y == 0 or self.chessboard[x - 1][y - 1] == '1') and not (space and not leak):
+            is_bound = True
+        x = pos_x
+        y = pos_y
+        i = 0
+        space = False
+        while x + 1 < self.chessboard_size and y + 1 < self.chessboard_size and self.chessboard[x + 1][
+            y + 1] != '1' and i < 4:
+            x = x + 1
+            y = y + 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    y -= 1
+                    x -= 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+                    return
+
+        if (x + 1 == self.chessboard_size or y + 1 == self.chessboard_size or self.chessboard[x + 1][y + 1] == '1') and not (space and not leak):
+            if is_bound:
+                both_bound = True
+            else:
+                is_bound = True
+
+        if count >= 5 and not leak:
+            heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+            return
+        elif count == 4 and not is_bound and not leak:
+            count_4_unbound += 1
+        elif count == 4 and not both_bound and not leak:
+            count_4_bound += 1
+        elif count == 4 and not both_bound:
+            count_4_leak_bound += 1
+        elif count == 3 and not is_bound and not leak:
+            count_3_unbound += 1
+        elif count == 3 and not is_bound:
+            count_3_leak_unbound += 1
+        elif count > 0 and not is_dead:
+            is_related = True
+        is_dead = is_dead and both_bound
+
+        # check y,x
+        x = pos_x
+        y = pos_y
+        count = 1
+        i = 0
+        is_bound = False
+        both_bound = False
+        space = False
+        leak = False
+        while x + 1 < self.chessboard_size and y - 1 >= 0 and self.chessboard[x + 1][y - 1] != '1' and i < 4:
+            x = x + 1
+            y = y - 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    y += 1
+                    x -= 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+                    return
+        if (x + 1 == self.chessboard_size or y == 0 or self.chessboard[x + 1][y - 1] == '1') and not (space and not leak):
+            is_bound = True
+        x = pos_x
+        y = pos_y
+        i = 0
+        space = False
+        while x - 1 >= 0 and y + 1 < self.chessboard_size and self.chessboard[x - 1][y + 1] != '1' and i < 4:
+            x = x - 1
+            y = y + 1
+            i = i + 1
+            if self.chessboard[x][y] == '0':
+                if space or leak:
+                    y -= 1
+                    x += 1
+                    break
+                else:
+                    space = True
+                    i -= 1
+            else:
+                count = count + 1
+                if space:
+                    leak = True
+                if count >= 5 and not leak:
+                    heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+                    return
+        if (x == 0 or y + 1 == self.chessboard_size or self.chessboard[x - 1][y + 1] == '1') and not (space and not leak):
+            if is_bound:
+                both_bound = True
+            else:
+                is_bound = True
+        if count >= 5 and not leak:
+            heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+            return
+        elif count == 4 and not is_bound and not leak:
+            count_4_unbound += 1
+        elif count == 4 and not both_bound and not leak:
+            count_4_bound += 1
+        elif count == 4 and not both_bound:
+            count_4_leak_bound += 1
+        elif count == 3 and not is_bound and not leak:
+            count_3_unbound += 1
+        elif count == 3 and not is_bound:
+            count_3_leak_unbound += 1
+        elif count > 0 and not is_dead:
+            is_related = True
+        is_dead = is_dead and both_bound
+
+        if count_5 > 0:
+            heapq.heappush(self.blackValue, (1, pos_x, pos_y))
+            return
+        count4b = count_4_leak_bound + count_4_bound
+        count3u = count_3_leak_unbound + count_3_unbound
+        if count_4_unbound > 0 or count4b > 1 or (count3u >= 1 and count4b >= 1):
+            heapq.heappush(self.blackValue, (2, pos_x, pos_y))
+            return
+        if count3u > 1:
+            heapq.heappush(self.blackValue, (3, pos_x, pos_y))
+            return
+        if count_3_unbound > 0 or count_4_bound > 0:
+            heapq.heappush(self.blackValue, (4, pos_x, pos_y))
+            return
+        if is_related and not is_dead:
+            heapq.heappush(self.blackValue, (5, pos_x, pos_y))
+            return
+        if not is_dead:
+            heapq.heappush(self.blackValue, (6, pos_x, pos_y))
+        else:
+            heapq.heappush(self.blackValue, (7, pos_x, pos_y))
