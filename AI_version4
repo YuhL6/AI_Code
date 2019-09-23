@@ -1,0 +1,437 @@
+import numpy as np
+import random
+import heapq
+import time
+
+COLOR_BLACK=-1
+COLOR_WHITE=1
+COLOR_NONE=0
+random.seed(0)
+#don't change the class name
+class AI(object):
+    #chessboard_size, color, time_out passed from agent
+    def __init__(self, chessboard_size, color, time_out):
+        self.chessboard_size = chessboard_size
+        #You are white or black
+        self.color = color
+        #the max time you should use, your algorithm's run time must not exceed the time limit.
+        self.time_out = time_out
+        # You need add your decision into your candidate_list. System will get the end of your candidate_list as your decision .
+        self.candidate_list = []
+        self.chessboard = []
+        self.whiteValue = []
+        self.blackValue = []
+        self.visited_white = []
+        self.visited_black = []
+        self.count = 0
+    # The input is current chessboard.
+
+    # When pass the chessboard, the program first check whether it is a half or a new game
+    # To complete that, I design a count to record
+    # When the count == 0, first program scan the chessboard and turn it into chars: scan_turn
+    # After the char-chessboard is finished, program evaluate each none-pos
+    # To reduce the complexity, program would use different strategies to evaluate
+    # After the evaluation is completed, the computer decide which to go by using decide_go
+    def go(self, chessboard=[]):
+        # Clear candidate_list
+        self.candidate_list.clear()
+        self.whiteValue.clear()
+        self.blackValue.clear()
+        self.chessboard.clear()
+        self.visited_black.clear()
+        self.visited_white.clear()
+
+        # ==================================================================
+        self.scan_turn(chessboard)
+        idx = np.where(chessboard != COLOR_NONE)
+        idx = list(zip(idx[0], idx[1]))
+        if self.count == 0 and self.color == COLOR_BLACK and len(idx) == 0:
+            self.candidate_list.append([7, 7])
+            return
+        idx = np.where(chessboard == COLOR_NONE)
+        idx = list(zip(idx[0], idx[1]))
+        decolor = 0 - self.color
+        level_self = 100
+        level_enemy = 100
+        for i in range(len(idx)):
+            if (self.color == COLOR_WHITE and not self.visited_white[idx[i][0]][idx[i][1]]) or (self.color == COLOR_BLACK and not self.visited_black[idx[i][0]][idx[i][1]]):
+                level_self = self.calculate(idx[i][0], idx[i][1], self.color)
+            if (decolor == COLOR_WHITE and not self.visited_white[idx[i][0]][idx[i][1]]) or (decolor == COLOR_BLACK and not self.visited_black[idx[i][0]][idx[i][1]]):
+                level_enemy = self.calculate(idx[i][0], idx[i][1], decolor)
+            if 8 <= level_self <= 13 and 8 <= level_enemy <= 13:
+                minv = min(level_self, level_enemy)
+                heapq.heappush(self.whiteValue, (minv, idx[i][0], idx[i][1]))
+                heapq.heappush(self.blackValue, (minv, idx[i][0], idx[i][1]))
+            else:
+                heapq.heappush(self.whiteValue, (level_self, idx[i][0], idx[i][1]))
+                heapq.heappush(self.blackValue, (level_enemy, idx[i][0], idx[i][1]))
+        self.decide_go()
+        self.count += 1
+        print(self.candidate_list[-1])
+
+    # decide and load the next pos to the list
+    # update the chessboard
+    def decide_go(self):
+        if len(self.blackValue) == 0 or self.whiteValue[0][0] <= self.blackValue[0][0]:
+            self.candidate_list.append([self.whiteValue[0][1], self.whiteValue[0][2]])
+        else:
+            self.candidate_list.append([self.blackValue[0][1], self.blackValue[0][2]])
+
+    def evaluate(self, str, is_bound_front, is_bound_behind):
+        is_both_bound = is_bound_behind and is_bound_front
+        is_bound_by_one_side = (is_bound_front or is_bound_behind)
+        if str == "11111" or str == "22222":
+            return 1
+        if (str == "01111" and not is_bound_behind) or (str == "11110" and not is_bound_front):
+            return 2
+        if (str == "02222" and not is_bound_behind) or (str == "22220" and not is_bound_front):
+            return 2
+        if (str == "21111" and not is_bound_behind) or (str == "01111" and is_bound_behind):
+            return 3
+        if (str == "11112" and not is_bound_front) or (str == "11110" and is_bound_front):
+            return 3
+        if (str == "12222" and not is_bound_behind) or (str == "02222" and is_bound_behind):
+            return 3
+        if (str == "22221" and not is_bound_front) or (str == "22220" and is_bound_front):
+            return 3
+        if (str == "10111" and is_bound_by_one_side) or (str == "11011" and is_bound_by_one_side) or (str == "11101" and is_bound_by_one_side):
+            return 4
+        if (str == "20222" and is_bound_by_one_side) or (str == "22022" and is_bound_by_one_side) or (str == "22202" and is_bound_by_one_side):
+            return 4
+        if (str == "11100" and not is_bound_front) or (str == "01110") or (str == "00111" and not is_bound_behind):
+            return 5
+        if (str == "22200" and not is_bound_front) or (str == "02220") or (str == "00222" and not is_bound_behind):
+            return 5
+        if (str == "11100" and is_bound_front) or (str == "00111" and is_bound_behind):
+            return 6
+        if (str == "22200" and is_bound_front) or (str == "00222" and is_bound_behind):
+            return 6
+        if (str == "10110" and not is_bound_front) or (str == "11010" and not is_bound_front):
+            return 7
+        if (str == "01011" and not is_bound_behind) or (str == "01101" and not is_bound_behind):
+            return 7
+        if (str == "20220" and not is_bound_front) or (str == "22020" and not is_bound_front):
+            return 7
+        if (str == "02022" and not is_bound_behind) or (str == "02202" and not is_bound_behind):
+            return 7
+        if (str == "10110") or (str == "11010"):
+            return 8
+        if (str == "01011") or (str == "01101"):
+            return 8
+        if (str == "20220") or (str == "22020"):
+            return 8
+        if (str == "02022") or (str == "02202"):
+            return 8
+        if str == "01100" or str == "02200" or str == "01102" or str == "02201":
+            return 9
+        return 100
+
+    # scan the chessboard and turn to the char type
+    def scan_turn(self, chessboard):
+        for i in range(self.chessboard_size):
+            str = ""
+            liw = []
+            lib = []
+            for j in range(self.chessboard_size):
+                if chessboard[i][j] == COLOR_NONE:
+                    str += '0'
+                elif chessboard[i][j] == COLOR_WHITE:
+                    str += '1'
+                else:
+                    str += '2'
+                liw.append(False)
+                lib.append(False)
+            self.visited_white.append(liw)
+            self.visited_black.append(lib)
+            self.chessboard.append(list(str))
+
+    def calculate(self, pos_x, pos_y, color): #pos of xy must be none
+        if color == COLOR_WHITE:
+            self.visited_white[pos_x][pos_y] = True
+        if color == COLOR_BLACK:
+            self.visited_black[pos_x][pos_y] = True
+        target = '2'
+        if color == COLOR_WHITE:
+            self.chessboard[pos_x][pos_y] = '1'
+        else:
+            self.chessboard[pos_x][pos_y] = '2'
+            target = '1'
+        count_5 = 0
+        count_4_unbound = 0
+        count_4_bound = 0
+        count_4_leak_bound = 0
+        count_3_unbound = 0
+        count_3_bound = 0
+        count_3_leak_unbound = 0
+        count_3_leak_bound = 0
+        more_important = 3
+        is_related = False
+        is_3 = False
+        # check y
+        x = pos_x
+        y = 0 if (pos_y - 4) <= 0 else (pos_y - 4)
+        level = 100
+        li = []
+        while y <= pos_y and (y + 4) < self.chessboard_size:
+            is_bound_front = False
+            is_bound_behind = False
+            if y == 0 or self.chessboard[x][y - 1] == target:
+                is_bound_front = True
+            if y + 5 >= self.chessboard_size or self.chessboard[x][y + 5] == target:
+                is_bound_behind = True
+            str = self.chessboard[x][y]
+            str += self.chessboard[x][y + 1]
+            str += self.chessboard[x][y + 2]
+            str += self.chessboard[x][y + 3]
+            str += self.chessboard[x][y + 4]
+            tmp = self.evaluate(str, is_bound_front, is_bound_behind)
+            li.append(tmp)
+            level = tmp if tmp < level else level
+            y += 1
+        if level == 1:
+            count_5 += 1
+        elif level == 2:
+            if self.chessboard[pos_x][pos_y+1] == '0':
+                more_important = min(more_important, self.is_important(color, pos_x, pos_y + 1, pos_x, pos_y))
+            elif self.chessboard[pos_x][pos_y-1] == '0':
+                more_important = min(more_important, self.is_important(color, pos_x, pos_y - 1, pos_x, pos_y))
+            count_4_unbound += 1
+        elif level == 3:
+            count_4_bound += 1
+        elif level == 4:
+            count_4_leak_bound += 1
+        elif level == 5:
+            count_3_unbound += 1
+        elif level == 6:
+            count_3_bound += 1
+        elif level == 7:
+            count_3_leak_unbound += 1
+        elif level == 8:
+            count_3_leak_bound += 1
+        elif level == 9:
+            is_related = True
+        if len(li) == 5 and li[0] == 4 and li[-1] == 4:
+            is_3 = True
+
+        # check x
+        x = 0 if pos_x - 4 <= 0 else pos_x - 4
+        y = pos_y
+        level = 100
+        li.clear()
+        while x <= pos_x and (x + 4) < self.chessboard_size:
+            is_bound_front = False
+            is_bound_behind = False
+            if x == 0 or self.chessboard[x - 1][y] == target:
+                is_bound_front = True
+            if x + 5 >= self.chessboard_size or self.chessboard[x + 5][y] == target:
+                is_bound_behind = True
+            str = self.chessboard[x][y]
+            str += self.chessboard[x + 1][y]
+            str += self.chessboard[x + 2][y]
+            str += self.chessboard[x + 3][y]
+            str += self.chessboard[x + 4][y]
+            tmp = self.evaluate(str, is_bound_front, is_bound_behind)
+            li.append(tmp)
+            level = tmp if tmp < level else level
+            x += 1
+        if level == 1:
+            count_5 += 1
+        elif level == 2:
+            if self.chessboard[pos_x+1][pos_y] == '0':
+                more_important = min(more_important, self.is_important(color, pos_x + 1, pos_y, pos_x, pos_y))
+            elif self.chessboard[pos_x-1][pos_y] == '0':
+                more_important = min(more_important, self.is_important(color, pos_x - 1, pos_y, pos_x, pos_y))
+            count_4_unbound += 1
+        elif level == 3:
+            count_4_bound += 1
+        elif level == 4:
+            count_4_leak_bound += 1
+        elif level == 5:
+            count_3_unbound += 1
+        elif level == 6:
+            count_3_bound += 1
+        elif level == 7:
+            count_3_leak_unbound += 1
+        elif level == 8:
+            count_3_leak_bound += 1
+        elif level == 9:
+            is_related = True
+
+        if len(li) == 5 and li[0] == 4 and li[-1] == 4:
+            is_3 = True
+        # check x,y
+        if pos_x < 4 and pos_y >= pos_x:
+            x = 0
+            y = pos_y - pos_x
+        elif pos_y < 4 and pos_x > pos_y:
+            y = 0
+            x = pos_x - pos_y
+        else:
+            x = pos_x - 4
+            y = pos_y - 4
+        level = 100
+        li.clear()
+        while x <= pos_x and (x + 4) < self.chessboard_size and y <= pos_y and (y + 4) < self.chessboard_size:
+            is_bound_front = False
+            is_bound_behind = False
+            if x == 0 or y == 0 or self.chessboard[x - 1][y - 1] == target:
+                is_bound_front = True
+            if x + 5 >= self.chessboard_size or y + 5 >= self.chessboard_size or self.chessboard[x + 5][y + 5] == target:
+                is_bound_behind = True
+            str = self.chessboard[x][y]
+            str += self.chessboard[x + 1][y + 1]
+            str += self.chessboard[x + 2][y + 2]
+            str += self.chessboard[x + 3][y + 3]
+            str += self.chessboard[x + 4][y + 4]
+            tmp = self.evaluate(str, is_bound_front, is_bound_behind)
+            li.append(tmp)
+            level = tmp if tmp < level else level
+            x += 1
+            y += 1
+        if level == 1:
+            count_5 += 1
+        elif level == 2:
+            if self.chessboard[pos_x+1][pos_y+1] == '0':
+                more_important = min(more_important, self.is_important(color, pos_x + 1, pos_y + 1, pos_x, pos_y))
+            elif self.chessboard[pos_x-1][pos_y-1] == '0':
+                more_important = min(more_important, self.is_important(color, pos_x - 1, pos_y - 1, pos_x, pos_y))
+            count_4_unbound += 1
+        elif level == 3:
+            count_4_bound += 1
+        elif level == 4:
+            count_4_leak_bound += 1
+        elif level == 5:
+            count_3_unbound += 1
+        elif level == 6:
+            count_3_bound += 1
+        elif level == 7:
+            count_3_leak_unbound += 1
+        elif level == 8:
+            count_3_leak_bound += 1
+        elif level == 9:
+            is_related = True
+        if len(li) == 5 and li[0] == 4 and li[-1] == 4:
+            is_3 = True
+        # check y,x
+        if pos_x + 4 >= self.chessboard_size and pos_y >= self.chessboard_size - 1 - pos_x:
+            x = self.chessboard_size - 1
+            y = pos_y - x + pos_x
+        elif pos_y < 4 and pos_x + pos_y < self.chessboard_size:
+            y = 0
+            x = pos_x + pos_y
+        else:
+            x = pos_x + 4
+            y = pos_y - 4
+        level = 100
+        li.clear()
+        while x >= pos_x and (x - 4) >= 0 and y <= pos_y and (y + 4) < self.chessboard_size:
+            is_bound_front = False
+            is_bound_behind = False
+            if x == self.chessboard_size - 1 or y == 0 or self.chessboard[x + 1][y - 1] == target:
+                is_bound_front = True
+            if x - 4 <= 0 or y + 5 >= self.chessboard_size or self.chessboard[x - 5][y + 5] == target:
+                is_bound_behind = True
+            str = self.chessboard[x][y]
+            str += self.chessboard[x - 1][y + 1]
+            str += self.chessboard[x - 2][y + 2]
+            str += self.chessboard[x - 3][y + 3]
+            str += self.chessboard[x - 4][y + 4]
+            tmp = self.evaluate(str, is_bound_front, is_bound_behind)
+            li.append(tmp)
+            level = tmp if tmp < level else level
+            x -= 1
+            y += 1
+        if level == 1:
+            count_5 += 1
+        elif level == 2:
+            if self.chessboard[pos_x-1][pos_y+1] == '0':
+                more_important = min(more_important, self.is_important(color, pos_x - 1, pos_y + 1, pos_x, pos_y))
+            elif self.chessboard[pos_x+1][pos_y-1] == '0':
+                more_important = min(more_important, self.is_important(color, pos_x + 1, pos_y - 1, pos_x, pos_y))
+            count_4_unbound += 1
+        elif level == 3:
+            count_4_bound += 1
+        elif level == 4:
+            count_4_leak_bound += 1
+        elif level == 5:
+            count_3_unbound += 1
+        elif level == 6:
+            count_3_bound += 1
+        elif level == 7:
+            count_3_leak_unbound += 1
+        elif level == 8:
+            count_3_leak_bound += 1
+        elif level == 9:
+            is_related = True
+
+        if len(li) == 5 and li[0] == 4 and li[-1] == 4:
+            is_3 = True
+
+        self.chessboard[pos_x][pos_y] = '0'
+        if count_5 > 0:
+            return 1
+        count4b = count_4_leak_bound + count_4_bound
+        count3u = count_3_leak_unbound + count_3_unbound
+        if count_4_unbound > 0:
+            if count4b > 0 or count3u > 0:
+                return 2
+            else:
+                if is_3:
+                    return 3
+                tmp = 100
+                if is_related:
+                    tmp = 4
+                return min(tmp, 2 + more_important)
+        if is_3:
+            return 3
+        if count4b > 1 or (count3u >= 1 and count4b >= 1):
+            return 6
+        if count3u > 1:
+            return 7
+        # the above situations are win-strategy
+        if count_4_bound > 0:
+            if count_3_bound > 0 or count_3_leak_bound > 0:
+                return 8
+            elif is_related:
+                return 9
+            else:
+                return 10
+        if count_4_leak_bound > 0:
+            if count_3_bound > 0 or count_3_leak_bound > 0:
+                return 9
+            elif is_related:
+                return 10
+            else:
+                return 11
+
+        if count_3_unbound > 0:
+            if count_3_bound > 0 or count_3_leak_bound > 0:
+                return 10
+            elif is_related:
+                return 11
+            else:
+                return 12
+        if count_3_leak_unbound > 0:
+            if count_3_bound > 0 or count_3_leak_bound > 0:
+                return 11
+            elif is_related:
+                return 12
+            else:
+                return 13
+        if is_related:
+            return 15
+        else:
+            return 100
+
+    def is_important(self, color, x, y, pos_x, pos_y):
+        self.chessboard[pos_x][pos_y] = '0'
+        tmp = self.calculate(x, y, color)
+        if color == COLOR_WHITE:
+            self.chessboard[pos_x][pos_y] = '1'
+        else:
+            self.chessboard[pos_x][pos_y] = '2'
+        if tmp < 8:
+            return 1
+        if tmp == 8:
+            return 3
+        return 4
