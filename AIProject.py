@@ -1,9 +1,7 @@
 import cv2
-from api import load_image_file
-from api import face_encodings
-from api import face_locations
-from api import compare_faces
+from face_recognition import #
 import PIL.Image
+import time
 import numpy as np
 import threading
 import os
@@ -14,26 +12,29 @@ def camera():
     global counter
     camera = cv2.VideoCapture(0)
     cv2.namedWindow('MyCamera')
+    ctime = time.time()
     while True:
         success, frame = camera.read()
-        locations = face_locations(frame)
-        faces = face_encodings(frame)
-        for i in range(0, len(locations)):
-            location = locations[i]
-            cv2.rectangle(frame, (location[3], location[0]), (location[1], location[2]), (255, 255, 255))
-            have_same = False
-            for key in dic:
-                if compare_faces([faces[i]], dic[key],tolerance=0.4)[0]:
-                    # print('existed face',str(key))
-                    cv2.putText(frame, str(key), (location[1], location[2]), font, font_scale, (255, 255, 255))
-                    have_same = True
-                    break
-            if not have_same:
-                counter += 1
-                # print('new face!')
-                dic[str(counter)] = faces[i]
-                # print(dic)
-                cv2.putText(frame, str(counter), (location[1], location[2]), font, font_scale, (255, 255, 255))
+        if time.time() > ctime:
+            ctime = time.time()
+            locations = face_locations(frame)
+            faces = face_encodings(frame)
+            for i in range(0, len(locations)):
+                location = locations[i]
+                cv2.rectangle(frame, (location[3], location[0]), (location[1], location[2]), (255, 255, 255))
+                have_same = False
+                for key in dic:
+                    if compare_faces([faces[i]], dic[key],tolerance=0.4)[0]:
+                        # print('existed face',str(key))
+                        cv2.putText(frame, str(key), (location[1], location[2]), font, font_scale, (255, 255, 255))
+                        have_same = True
+                        break
+                if not have_same:
+                    counter += 1
+                    # print('new face!')
+                    dic[str(counter)] = faces[i]
+                    # print(dic)
+                    cv2.putText(frame, str(counter), (location[1], location[2]), font, font_scale, (255, 255, 255))
         cv2.imshow('MyCamera', frame)
         if cv2.waitKey(1) & 0xff == ord(' '):
             break
