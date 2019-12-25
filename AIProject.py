@@ -12,11 +12,12 @@ def camera():
     global counter
     camera = cv2.VideoCapture(0)
     cv2.namedWindow('MyCamera')
-    ctime = time.time()
+    ctime1 = time.time()
+    ctime2 = time.time()
     while True:
         success, frame = camera.read()
-        if time.time() - ctime > 0.8:
-            ctime = time.time()
+        if time.time() - ctime1 > 0.8:
+            ctime1 = time.time()
             locations = face_locations(frame)
             faces = face_encodings(frame)
             for i in range(0, len(locations)):
@@ -35,9 +36,9 @@ def camera():
                     dic[str(counter)] = faces[i]
                     # print(dic)
                     cv2.putText(frame, str(counter), (location[1], location[2]), font, font_scale, (255, 255, 255))
-        else:
+        elif time.time() - ctime2 > 0.1:
+            ctime2 = time.time()
             locations = face_locations(frame)
-            faces = face_encodings(frame)
             for i in range(0, len(locations)):
                 location = locations[i]
                 cv2.rectangle(frame, (location[3], location[0]), (location[1], location[2]), (255, 255, 255))
