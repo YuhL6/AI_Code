@@ -1,5 +1,5 @@
 import cv2
-from face_recognition import #
+from face_recognition import *
 import PIL.Image
 import time
 import numpy as np
@@ -15,7 +15,7 @@ def camera():
     ctime = time.time()
     while True:
         success, frame = camera.read()
-        if time.time() > ctime:
+        if time.time() - ctime > 0.8:
             ctime = time.time()
             locations = face_locations(frame)
             faces = face_encodings(frame)
@@ -35,6 +35,12 @@ def camera():
                     dic[str(counter)] = faces[i]
                     # print(dic)
                     cv2.putText(frame, str(counter), (location[1], location[2]), font, font_scale, (255, 255, 255))
+        else:
+            locations = face_locations(frame)
+            faces = face_encodings(frame)
+            for i in range(0, len(locations)):
+                location = locations[i]
+                cv2.rectangle(frame, (location[3], location[0]), (location[1], location[2]), (255, 255, 255))
         cv2.imshow('MyCamera', frame)
         if cv2.waitKey(1) & 0xff == ord(' '):
             break
