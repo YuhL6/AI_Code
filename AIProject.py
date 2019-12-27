@@ -16,7 +16,8 @@ def camera():
     ctime2 = time.time()
     while True:
         success, frame = camera.read()
-        if time.time() - ctime1 > 0.8:
+        small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+        if time.time() - ctime1 > 1:
             ctime1 = time.time()
             locations = face_locations(frame)
             faces = face_encodings(frame)
@@ -25,7 +26,7 @@ def camera():
                 cv2.rectangle(frame, (location[3], location[0]), (location[1], location[2]), (255, 255, 255))
                 have_same = False
                 for key in dic:
-                    if compare_faces([faces[i]], dic[key],tolerance=0.4)[0]:
+                    if compare_faces([faces[i]], dic[key],tolerance=0.45)[0]:
                         # print('existed face',str(key))
                         cv2.putText(frame, str(key), (location[1], location[2]), font, font_scale, (255, 255, 255))
                         have_same = True
